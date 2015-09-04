@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 pub use self::builder::Builder;
 
 mod builder;
+mod deser;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
     uuid: String,
     name: Option<String>,
