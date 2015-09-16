@@ -1,3 +1,7 @@
+use handlebars::{
+    self,
+    Handlebars
+};
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
