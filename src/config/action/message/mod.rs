@@ -54,6 +54,8 @@ impl PartialEq for MessageAction {
     }
 }
 
+impl Eq for MessageAction {}
+
 impl From<MessageAction> for super::ActionType {
     fn from(action: MessageAction) -> super::ActionType {
         super::ActionType::Message(action)
