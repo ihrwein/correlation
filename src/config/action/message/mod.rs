@@ -7,6 +7,7 @@ use handlebars::{
 use rustc_serialize::json::ToJson;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
+use std::fmt;
 
 use message::{
     Message,
@@ -59,6 +60,17 @@ impl Eq for MessageAction {}
 impl From<MessageAction> for super::ActionType {
     fn from(action: MessageAction) -> super::ActionType {
         super::ActionType::Message(action)
+    }
+}
+
+impl fmt::Debug for MessageAction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("MessageAction")
+            .field("uuid", self.uuid())
+            .field("name", &self.name())
+            .field("message", &self.message().to_string())
+            .field("values", self.values())
+            .finish();
     }
 }
 
