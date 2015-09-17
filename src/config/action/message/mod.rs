@@ -1,6 +1,8 @@
 use handlebars::{
     self,
-    Handlebars
+    Handlebars,
+    RenderError,
+    Template
 };
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
@@ -16,11 +18,11 @@ mod builder;
 
 pub use self::builder::MessageActionBuilder;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct MessageAction {
     uuid: String,
     name: Option<String>,
-    message: String,
+    message: Template,
     values: BTreeMap<String, String>
 }
 
@@ -31,11 +33,14 @@ impl MessageAction {
     pub fn name(&self) -> Option<&String> {
         self.name.as_ref()
     }
-    pub fn message(&self) -> &String {
+    pub fn message(&self) -> &Template {
         &self.message
     }
     pub fn values(&self) -> &BTreeMap<String, String> {
         &self.values
+    }
+    pub fn render_message<T>(&self, data: T) -> Result<Message, RenderError> where T: ToJson {
+
     }
 }
 
