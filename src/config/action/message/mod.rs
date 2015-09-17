@@ -4,6 +4,7 @@ use handlebars::{
     RenderError,
     Template
 };
+use rustc_serialize::json::ToJson;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
