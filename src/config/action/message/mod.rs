@@ -44,6 +44,15 @@ impl MessageAction {
     }
 }
 
+impl PartialEq for MessageAction {
+    fn eq(&self, other: &MessageAction) -> bool {
+        self.uuid() == other.uuid() &&
+        self.name() == other.name() &&
+        self.message().to_string() == other.message().to_string() &&
+        self.values() == other.values()
+    }
+}
+
 impl From<MessageAction> for super::ActionType {
     fn from(action: MessageAction) -> super::ActionType {
         super::ActionType::Message(action)
