@@ -39,15 +39,16 @@ mod exit_handler;
 #[cfg(test)]
 mod test;
 
-pub struct Correlator {
+pub struct Correlator<T=()> {
     dispatcher_input_channel: mpsc::Sender<Request>,
     dispatcher_output_channel: mpsc::Receiver<Response>,
     dispatcher_thread_handle: thread::JoinHandle<ContextMap>,
     handlers: HashMap<ResponseHandle, Box<EventHandler<Response, mpsc::Sender<Request>>>>,
+    handler_data: Option<T>
 }
 
-impl Correlator {
-    pub fn new(context_map: ContextMap) -> Correlator {
+impl<T> Correlator<T> {
+    pub fn new(context_map: ContextMap) -> Correlator<T> {
         let (dispatcher_input_channel, rx) = mpsc::channel();
         let (dispatcher_output_channel_tx, dispatcher_output_channel_rx) = mpsc::channel();
         Timer::from_chan(Duration::from_millis(TIMER_STEP_MS),
@@ -75,6 +76,7 @@ impl Correlator {
             dispatcher_output_channel: dispatcher_output_channel_rx,
             dispatcher_thread_handle: handle,
             handlers: HashMap::new(),
+            handler_data: None
         }
     }
 
@@ -118,7 +120,7 @@ impl Correlator {
     }
 }
 
-impl FromStr for Correlator {
+impl<T> FromStr for Correlator<T> {
     type Err = Error;
     fn from_str(buffer: &str) -> Result<Self, Self::Err> {
         let contexts = try!(serde_json::from_str::<Vec<ContextConfig>>(buffer));

@@ -17,7 +17,7 @@ use super::Error;
 pub struct CorrelatorFactory;
 
 impl CorrelatorFactory {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Correlator, Error> {
+    pub fn from_path<T, P: AsRef<Path>>(path: P) -> Result<Correlator<T>, Error> {
         trace!("Trying to load contexts from file; path={}", path.as_ref().display());
         let mut file = try!(File::open(path));
         let mut buffer = String::new();
