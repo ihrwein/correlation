@@ -7,25 +7,23 @@
 // modified, or distributed except according to those terms.
 
 use serde_json;
-use std::collections::HashMap;
-use std::sync::mpsc;
+use std::sync::mpsc::{self, Sender};
 use std::thread;
 use std::time::Duration;
 use std::sync::Arc;
 use std::str::FromStr;
 
 use {Message, Response};
+use action::Alert;
 use config::ContextConfig;
 use context::ContextMap;
 use dispatcher::request::Request;
 use dispatcher::reactor::RequestReactor;
-use dispatcher::ResponseHandle;
 use dispatcher::demux::Demultiplexer;
 use dispatcher::handlers::exit::ExitEventHandler;
 use dispatcher::handlers::timer::TimerEventHandler;
 use dispatcher::handlers::message::MessageEventHandler;
-use self::exit_handler::ExitHandler;
-use reactor::{Event, Reactor, EventHandler};
+use reactor::{Reactor, EventHandler};
 use timer::Timer;
 
 const TIMER_STEP_MS: u64 = 100;
@@ -35,16 +33,18 @@ pub use self::factory::CorrelatorFactory;
 
 mod error;
 mod factory;
-mod exit_handler;
 #[cfg(test)]
 mod test;
+
+pub trait AlertHandler<D> {
+    fn on_alert(&mut self, alert: Alert, channel: &mut Sender<Request>, extra_data: &mut D);
+}
 
 pub struct Correlator<T=()> {
     dispatcher_input_channel: mpsc::Sender<Request>,
     dispatcher_output_channel: mpsc::Receiver<Response>,
     dispatcher_thread_handle: thread::JoinHandle<ContextMap>,
-    handlers: HashMap<ResponseHandle, Box<EventHandler<Response, mpsc::Sender<Request>>>>,
-    handler_data: Option<T>
+    alert_handler: Option<Box<AlertHandler<T>>>
 }
 
 impl<T> Correlator<T> {
@@ -75,47 +75,50 @@ impl<T> Correlator<T> {
             dispatcher_input_channel: dispatcher_input_channel,
             dispatcher_output_channel: dispatcher_output_channel_rx,
             dispatcher_thread_handle: handle,
-            handlers: HashMap::new(),
-            handler_data: None
+            alert_handler: None
         }
     }
 
-    pub fn register_handler(&mut self,
-                            handler: Box<EventHandler<Response, mpsc::Sender<Request>>>) {
-        self.handlers.insert(handler.handle(), handler);
+    pub fn set_alert_handler(&mut self,
+                            handler: Option<Box<AlertHandler<T>>>) {
+        self.alert_handler = handler;
     }
 
     pub fn push_message(&mut self, message: Message) -> Result<(), mpsc::SendError<Request>> {
-        self.handle_events();
         self.dispatcher_input_channel.send(Request::Message(Arc::new(message)))
     }
 
-    fn handle_event(&mut self, event: Response) {
-        if let Some(handler) = self.handlers.get_mut(&event.handle()) {
-            handler.handle_event(event, &mut self.dispatcher_input_channel);
-        } else {
-            trace!("no event handler found for handling a Response");
+    fn handle_event(&mut self, event: Response, external_handler_data: &mut T) {
+        match event {
+            Response::Exit => {
+                let _ = self.dispatcher_input_channel.send(Request::Exit);
+            },
+            Response::Alert(alert) => {
+                if let Some(handler) = self.alert_handler.as_mut() {
+                    handler.on_alert(alert, &mut self.dispatcher_input_channel, external_handler_data);
+                } else {
+                    trace!("No Alert handler is registereted in Correlator but an alert is received");
+                }
+            }
         }
     }
 
-    pub fn handle_events(&mut self) {
+    pub fn handle_events(&mut self, external_handler_data: &mut T) {
         for i in self.dispatcher_output_channel.try_recv() {
-            self.handle_event(i);
+            self.handle_event(i, external_handler_data);
         }
     }
 
-    pub fn stop(mut self) -> thread::Result<ContextMap> {
-        self.handle_events();
-        self.stop_dispatcher();
+    pub fn stop(mut self, external_handler_data: &mut T) -> thread::Result<ContextMap> {
+        self.handle_events(external_handler_data);
+        self.stop_dispatcher(external_handler_data);
         self.dispatcher_thread_handle.join()
     }
 
-    fn stop_dispatcher(&mut self) {
-        let exit_handler = Box::new(ExitHandler::new());
-        self.register_handler(exit_handler);
+    fn stop_dispatcher(&mut self, external_handler_data: &mut T) {
         let _ = self.dispatcher_input_channel.send(Request::Exit);
         while let Ok(event) = self.dispatcher_output_channel.recv() {
-            self.handle_event(event);
+            self.handle_event(event, external_handler_data);
         }
     }
 }
